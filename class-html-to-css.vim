@@ -16,14 +16,14 @@
 "
 let s:save_cpo = &cpo
 set cpo&vim
-set fileformat=unix
-set fileformats=unix,dos
 
-function! s:GetClassLines(files) abort
+function! GetClassLines(files) abort
   let l:unite_content = []
   for file in a:files
-    " echomsg a:files
-    let l:file_content = readfile(file, "b")
+    " echomsg a:files . " " . file
+    echomsg file
+    let l:file_content = readfile(file)
+    " let l:file_content = readfile(file, "b")
     " echomsg l:file_content
     let l:sorted_content = filter(l:file_content, 'v:val =~ "class="')
     " echomsg l:sorted_content
@@ -32,7 +32,7 @@ function! s:GetClassLines(files) abort
   return l:unite_content
 endfunction
 
-function! s:SanitizeClassList(arr) abort
+function! SanitizeClassList(arr) abort
   let l:cleaned_arr = []
   let l:classes = []
   let l:cleaned_str = ""
@@ -45,32 +45,61 @@ function! s:SanitizeClassList(arr) abort
   return uniq(l:cleaned_arr)
 endfunction
 
-function s:InitThisScript() abort
-  let s:index_html = "index.html"
-  let s:cwd = expand("%:p:h")
-  let s:htmls = filter(readdir(s:cwd), 'v:val =~ ".html$"')
-  let s:css_file = "main.css"
-  " let class_lines = execute(s:GetClassLines(htmls))
-  " let classes = execute(s:SanitizeClassList(class_lines))
-  let s:class_lines = s:GetClassLines(s:htmls)
-  let s:classes = s:SanitizeClassList(s:class_lines)
-" echomsg s:classes
+function! GetStylesFile(index) abort
+  " - Current file is index % 
+  " - read file
+    let l:index_content = readfile(a:index)
+    " echomsg index_content
+    let l:main_css_line = filter(index_content, function('IsMainStyleLine') )[0]
+    " echomsg main_css_line
+    let l:main_css_file = matchstr(main_css_line, '\v.*href\="\zs.*\.css\ze".*')
+    " ?: How to chose if multiple link:css lines (vendor styles)
+    " - get link:css line
+    "   - man.css, style.css, site.css, default.css, template.css, global.css, myappname.css, stylesheet.css
+    "   - user defined names array
+    " - parse *.css fliename
+    " <link rel="stylesheet" href="main.css" />
+    return l:main_css_file
 endfunction
-call s:InitThisScript()
 
-function! s:WriteToCSS() abort
+function! IsMainStyleLine(idx, val)
+  return match(a:val, '\v^[ ]+\<link.*rel\="stylesheet".*href\="[\w\W]*.*(main|style|site|default|global|stylesheet|)\.css".*\>') == 0
+endfunction
+
+function! InitThisScript() abort
+  let s:index_html_path = expand("%:p")
+  let s:script_cwd = expand("%:p:h")
+  let s:htmls = filter(readdir(s:script_cwd), 'v:val =~ ".html$"')
+  " echomsg s:htmls
+  " let s:css_file = "main.css"
+  let s:css_file = GetStylesFile(s:index_html_path)
+  echomsg s:css_file . ". " . s:index_html_path
+  let s:class_lines = GetClassLines(s:htmls)
+  let s:classes = SanitizeClassList(s:class_lines)
+  echo s:classes
+endfunction
+
+function! WriteToCSS() abort
+  " If visual mode then run function for copying from visual range
+  " Else:
+  call InitThisScript()
+  set fileformat=unix
+  set fileformats=unix,dos
   let l:classes_mutated = map(copy(s:classes), '"." . v:val . " {\r\r}\r"')
-  " echo l:classes_mutated
-  call writefile(l:classes_mutated, s:css_file, "ba") | echo "All classes written to '" . s:cwd . "/" .  s:css_file . "'"
+  echo l:classes_mutated
+  call writefile(l:classes_mutated, s:css_file, "bas") 
+  echo "All classes written to '" . s:script_cwd . "/" .  s:css_file . "'"
+  " echo l:classes_mutated . " " . s:script_cwd . " " . s:css_file
 endfunction
 
 " ======================== Commands =============================
 if !exists(":CSS2html")
-  command! -nargs=0 CSS2html call s:WriteToCSS()
+  command! -nargs=0 CSS2html call WriteToCSS()
 endif
 
 " ========================= Mappings =============================
 echomsg "Class2css loaded"
+echomsg s:css_file . ". " . s:index_html_path
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
