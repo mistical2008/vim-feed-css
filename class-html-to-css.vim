@@ -12,7 +12,8 @@
 " TODO:
 " - Get classes from visual selection
 " - Check for existing classes in *.css file
-" - Get *.css filename from index.html
+" + Get *.css filename from index.html
+" - Check *.css for emptiness (rewrite or append)
 "
 let s:save_cpo = &cpo
 set cpo&vim
@@ -52,7 +53,7 @@ function! GetStylesFile(index) abort
     " echomsg index_content
     let l:main_css_line = filter(index_content, function('IsMainStyleLine') )[0]
     " echomsg main_css_line
-    let l:main_css_file = matchstr(main_css_line, '\v.*href\="\zs.*\.css\ze".*')
+    let l:main_css_file = matchstr(main_css_line, '\v.*href\="[.]*[/]*\zs.*\.css\ze".*')
     " ?: How to chose if multiple link:css lines (vendor styles)
     " - get link:css line
     "   - man.css, style.css, site.css, default.css, template.css, global.css, myappname.css, stylesheet.css
