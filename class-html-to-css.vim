@@ -17,6 +17,23 @@
 "
 let s:save_cpo = &cpo
 set cpo&vim
+set fileencoding=utf-8
+scriptencoding utf-8
+set fileformat=unix
+
+function! GetRunningOS()
+  if has("win32")
+    return "win"
+  endif
+  if has("unix")
+    if system('uname')=~'Darwin'
+      return "mac"
+    else
+      return "linux"
+    endif
+  endif
+endfunction
+let s:os=GetRunningOS()
 
 function! GetClassLines(files) abort
   let l:unite_content = []
@@ -34,9 +51,7 @@ function! GetClassLines(files) abort
 endfunction
 
 function! SanitizeClassList(arr) abort
-  let l:cleaned_arr = []
   let l:classes = []
-  let l:cleaned_str = ""
   for item in a:arr
     let l:cleaned_item = matchstr(item, '\vclass\="\zs.*\ze"')
     call add(l:classes, l:cleaned_item)
@@ -94,13 +109,45 @@ function! WriteToCSS() abort
 endfunction
 
 " ======================== Commands =============================
-if !exists(":CSS2html")
-  command! -nargs=0 CSS2html call WriteToCSS()
+if !exists(":CSSexWriteAll")
+  command! -nargs=0 CSSexWriteAll call WriteToCSS()
 endif
 
-" ========================= Mappings =============================
-echomsg "Class2css loaded"
-echomsg s:css_file . ". " . s:index_html_path
+if !exists(":CSSexVis")
+  command! -nargs=0 -range CSSexVis <line1>,<line2>call GetClassesVis()
+endif
+
+"================================================================================
+"                                    Mappings:
+"================================================================================
+vnoremap <C-T> :CSSexVis<CR>
+ 
+" ========================= Autocmds: =============================
+autocmd BufEnter *.html echomsg "Class2css loaded"
+" echomsg s:css_file . ". " . s:index_html_path
+
+"================================================================================
+"                                 New functions:
+"================================================================================
+" Function for reading lines from range:
+function! GetClassesVis() range
+  setlocal fileformat=unix
+  let lines = []
+  for linenum in range(a:firstline, a:lastline)
+    call add(lines, getline(linenum))
+  endfor
+  let l:class_lines = filter(copy(lines), 'v:val =~ "class="')
+  " echomsg l:class_lines
+  let l:classes_arr = SanitizeClassList(l:class_lines)
+  " echomsg l:res
+  let l:res = map(l:classes_arr, '"." . v:val . " {\n\n}\n"')
+  echomsg join(l:res, "\n")
+  " let @+ = substitute(join(l:res, "\n"), '\n', '\n', 'g')
+  let @+ = join(l:res, "\n")
+  " let @@ = join(l:classes_raw, ", ")
+endfunction
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
+
+
